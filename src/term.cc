@@ -34,6 +34,13 @@ void sh::term::set_raw() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &trm);
 }
 
+void sh::term::clear_line_and_prompt() {
+    write("\r");
+    write(prompt_string);
+    cur = cursor::lcur::start;
+    line.clear();
+}
+
 void sh::term::clear_to_end() {
     write("\033[0K");
 }
@@ -65,6 +72,14 @@ void sh::term::delete_right() {
     redraw();
 }
 
+void sh::term::echo(std::string_view str) {
+    write(str);
+    line.append(str);
+    cur = cursor::lcur(line.size());
+}
+
+void sh::term::echo(char c) { echo(std::string_view(&c, 1)); }
+
 void sh::term::move_left() {
     if (cur == cursor::lcur::start) return;
     auto raw = size_t(cur);
@@ -79,12 +94,7 @@ void sh::term::move_right() {
     write("\033[1C");
 }
 
-void sh::term::new_line() {
-    write("\r");
-    write(prompt_string);
-    cur = cursor::lcur::start;
-    line.clear();
-}
+void sh::term::new_line() { write("\r\n"); }
 
 char sh::term::readc() {
     char c;
@@ -94,16 +104,24 @@ char sh::term::readc() {
 
     /// Handle special characters.
     switch (c) {
-            /// Ctrl+C.
+        /// Ctrl+C.
         case CTRL('C'):
-            write("^C\n");
             new_line();
+            clear_line_and_prompt();
             return -1;
 
         /// Ctrl+D.
         case CTRL('D'):
             write("\r\n");
             sh::exit();
+
+        /// Enter.
+        case '\r':
+        case '\n':
+            /// TODO: submit line.
+            new_line();
+            clear_line_and_prompt();
+            return -1;
 
         /// Escape sequences.
         case '\033':
@@ -112,7 +130,6 @@ char sh::term::readc() {
             if (n == 0) return -1;
 
             switch (c) {
-                    /// Arrow keys.
                 case '[': {
                     n = read(STDIN_FILENO, &c, 1);
                     if (n == -1) throw std::runtime_error("read() failed");
@@ -140,19 +157,29 @@ char sh::term::readc() {
                             if (n == -1) throw std::runtime_error("read() failed");
                             if (n == 0) return -1;
                             if (c == '~') delete_right();
-                            else write(fmt::format("^033[3{}", c));
+                            else echo(fmt::format("033[3{}", c));
+                            return -1;
+
+                        /// Home.
+                        case 'H':
+                            lmove_to(cursor::lcur::start);
+                            return -1;
+
+                        /// End.
+                        case 'F':
+                            lmove_to(cursor::lcur(line.size()));
                             return -1;
 
                         default:
-                            write("^033[");
-                            write(c);
+                            echo("033[");
+                            echo(c);
                             return -1;
                     }
                 }
 
                 default:
-                    write("^033");
-                    write(c);
+                    echo("033");
+                    echo(c);
                     return -1;
             }
 
@@ -162,8 +189,13 @@ char sh::term::readc() {
             return -1;
     }
 
-    cur = cursor::lcur(size_t(cur) + 1);
-    line += c;
+    if (std::iscntrl(c)) {
+        echo('^');
+        echo(char(c + '@'));
+        return -1;
+    }
+
+    echo(c);
     return c;
 }
 
@@ -176,7 +208,13 @@ void sh::term::redraw() {
 
 void sh::term::set_prompt(std::string_view prompt) {
     prompt_string = prompt;
-    prompt_size = prompt.size();
+
+    /// Strip color codes.
+    prompt_size = 0;
+    for (size_t i = 0; i < prompt.size(); i++) {
+        if (prompt[i] == '\033') while (prompt[i] != 'm') i++;
+        else prompt_size++;
+    }
 }
 
 std::string_view sh::term::text() { return line; }
@@ -188,6 +226,17 @@ void sh::term::cursor::up(size_t n) { write(fmt::format("\033[{}A", n)); }
 void sh::term::cursor::down(size_t n) { write(fmt::format("\033[{}B", n)); }
 void sh::term::cursor::right(size_t n) { write(fmt::format("\033[{}C", n)); }
 void sh::term::cursor::left(size_t n) { write(fmt::format("\033[{}D", n)); }
+
+void sh::term::cursor::lmove_to(cursor::lcur pos) {
+    auto raw = size_t(pos);
+    auto cur_raw = size_t(cur);
+
+    if (raw > cur_raw) right(raw - cur_raw);
+    else if (raw < cur_raw) left(cur_raw - raw);
+
+    cur = pos;
+}
+
 
 auto sh::term::cursor::save() -> pos {
     return pos{size_t(cur), 0};

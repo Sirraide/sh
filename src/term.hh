@@ -23,6 +23,9 @@ void set_raw();
 /// ===========================================================================
 ///  Terminal I/O.
 /// ===========================================================================
+/// Print the prompt.
+void clear_line_and_prompt();
+
 /// Clear from the cursor to the end of the line.
 void clear_to_end();
 
@@ -32,13 +35,17 @@ void delete_left();
 /// Delete the character to the right of the cursor.
 void delete_right();
 
+/// Write to the screen and the current line.
+void echo(std::string_view str);
+void echo(char c);
+
 /// Move the logical cursor to the left.
 void move_left();
 
 /// Move the logical cursor to the right.
 void move_right();
 
-/// Print the prompt.
+/// Move to a new line.
 void new_line();
 
 /// Read a character from the terminal.
@@ -69,6 +76,9 @@ void up(size_t n = 1);
 void down(size_t n = 1);
 void right(size_t n = 1);
 void left(size_t n = 1);
+
+/// Move the cursor to a logical position.
+void lmove_to(cursor::lcur pos);
 
 pos save();
 void restore(pos p);

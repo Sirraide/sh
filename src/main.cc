@@ -1,9 +1,14 @@
 #include "term.hh"
 #include <fmt/format.h>
+#include <filesystem>
 
 int main() {
     sh::term::set_raw();
-    sh::term::set_prompt("sh++> ");
+
+    auto path = std::filesystem::current_path().string();
+    auto home = std::getenv("HOME");
+    if (path.starts_with(home)) path.replace(0, std::strlen(home), "~");
+    sh::term::set_prompt(fmt::format("\033[33msh++ \033[38;2;79;151;215m{} \033[1;38;2;79;151;215m$ \033[m", path));
 
     auto debug = [&] {
         auto pos = sh::term::cursor::save();
@@ -12,7 +17,7 @@ int main() {
     };
 
     /// Shell main loop.
-    sh::term::new_line();
+    sh::term::clear_line_and_prompt();
     for (;;) {
         auto c = sh::term::readc();
 
@@ -20,13 +25,6 @@ int main() {
         if (c == -1) {
             debug();
             continue;
-        }
-
-        switch (c) {
-            default:
-                if (std::iscntrl(c)) sh::term::write(fmt::format("^{}", c + '@'));
-                else sh::term::write(c);
-                break;
         }
 
         debug();
