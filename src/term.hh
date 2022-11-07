@@ -48,8 +48,12 @@ void move_right();
 /// Move to a new line.
 void new_line();
 
+/// Read a line from the terminal.
+std::string read_line();
+
 /// Read a character from the terminal.
-char readc();
+/// \return Whether the current line should be executed.
+bool readc();
 
 /// Redraw the current line.
 void redraw();

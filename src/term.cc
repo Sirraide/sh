@@ -54,10 +54,10 @@ void sh::term::delete_left() {
     if (std::iscntrl(line[raw - 1])) line.erase(raw - 2, 2);
     else line.erase(raw - 1, 1);
 
-    redraw();
+    /// Adjust the logical cursor.
+    cur = cursor::lcur(raw - 1);
 
-    /// Move the cursor back.
-    move_left();
+    redraw();
 }
 
 void sh::term::delete_right() {
@@ -102,11 +102,19 @@ void sh::term::move_right() {
 
 void sh::term::new_line() { write("\r\n"); }
 
-char sh::term::readc() {
+std::string sh::term::read_line() {
+    while (not sh::term::readc());
+    write("\r");
+    auto ret = line;
+    line.clear();
+    return ret;
+}
+
+bool sh::term::readc() {
     char c;
     auto n = read(STDIN_FILENO, &c, 1);
     if (n == -1) throw std::runtime_error("read() failed");
-    if (n == 0) return -1;
+    if (n == 0) return false;
 
     /// Handle special characters.
     switch (c) {
@@ -114,7 +122,7 @@ char sh::term::readc() {
         case CTRL('C'):
             new_line();
             clear_line_and_prompt();
-            return -1;
+            return false;
 
         /// Ctrl+D.
         case CTRL('D'):
@@ -126,91 +134,90 @@ char sh::term::readc() {
         case '\n':
             /// TODO: submit line.
             new_line();
-            clear_line_and_prompt();
-            return -1;
+            return true;
 
         /// Escape sequences.
         case '\033':
             n = read(STDIN_FILENO, &c, 1);
             if (n == -1) throw std::runtime_error("read() failed");
-            if (n == 0) return -1;
+            if (n == 0) return false;
 
             switch (c) {
                 case '[': {
                     n = read(STDIN_FILENO, &c, 1);
                     if (n == -1) throw std::runtime_error("read() failed");
-                    if (n == 0) return -1;
+                    if (n == 0) return false;
 
                     switch (c) {
                         /// Up arrow.
                         case 'A':
-                            return -1;
+                            return false;
                         /// Down arrow.
                         case 'B':
-                            return -1;
+                            return false;
                         /// Right arrow.
                         case 'C':
                             move_right();
-                            return -1;
+                            return false;
                         /// Left arrow.
                         case 'D':
                             move_left();
-                            return -1;
+                            return false;
 
                         /// Insert.
                         case '2':
                             n = read(STDIN_FILENO, &c, 1);
                             if (n == -1) throw std::runtime_error("read() failed");
-                            if (n == 0) return -1;
+                            if (n == 0) return false;
                             if (c != '~') echo(fmt::format("033[2{}", c));
-                            return -1;
+                            return false;
 
                         /// Delete.
                         case '3':
                             n = read(STDIN_FILENO, &c, 1);
                             if (n == -1) throw std::runtime_error("read() failed");
-                            if (n == 0) return -1;
+                            if (n == 0) return false;
                             if (c == '~') delete_right();
                             else echo(fmt::format("033[3{}", c));
-                            return -1;
+                            return false;
 
                         /// Home.
                         case 'H':
                             lmove_to(cursor::lcur::start);
-                            return -1;
+                            return false;
 
                         /// End.
                         case 'F':
                             lmove_to(cursor::lcur(line.size()));
-                            return -1;
+                            return false;
 
                         default:
                             echo("033[");
                             echo(c);
-                            return -1;
+                            return false;
                     }
                 }
 
                 default:
                     echo("033");
                     echo(c);
-                    return -1;
+                    return false;
             }
 
         /// Backspace.
         case 0x7f:
             delete_left();
-            return -1;
+            return false;
     }
 
     if (std::iscntrl(c)) {
         echo('^');
         echo(char(c + '@'));
-        return -1;
+        return false;
     }
 
     echo(c);
-    return c;
+    return false;
 }
 
 void sh::term::redraw() {
@@ -218,6 +225,7 @@ void sh::term::redraw() {
     clear_to_end();
     write(prompt_string);
     write(line);
+    to(cur);
 }
 
 void sh::term::set_prompt(std::string_view prompt) {
