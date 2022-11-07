@@ -1,6 +1,8 @@
+#include "cmd.hh"
 #include "term.hh"
-#include <fmt/format.h>
+
 #include <filesystem>
+#include <fmt/format.h>
 
 int main() {
     sh::term::set_raw();
@@ -23,6 +25,6 @@ int main() {
 
         /// Read a line.
         auto line = sh::term::read_line();
-        fmt::print("Read line: \"{}\"\n", line);
+        sh::cmd::exec(line);
     }
 }

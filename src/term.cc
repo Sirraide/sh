@@ -14,6 +14,7 @@ std::string prompt_string;
 std::string line;
 size_t prompt_size;
 sh::term::cursor::lcur cur;
+bool line_continued = false;
 } // namespace
 
 termios sh::term::mode() {
@@ -33,6 +34,8 @@ void sh::term::set_raw() {
     trm.c_cc[VTIME] = 1;
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &trm);
 }
+
+void sh::term::reset() { set_mode(saved); }
 
 void sh::term::clear_line_and_prompt() {
     write("\r");
@@ -132,7 +135,17 @@ bool sh::term::readc() {
         /// Enter.
         case '\r':
         case '\n':
-            /// TODO: submit line.
+            /// Continue the line if the last char is a backslash.
+            if (not line.empty() and line.back() == '\\') {
+                line.pop_back();
+                cur = cursor::lcur(line.size());
+                line_continued = true;
+                new_line();
+                return false;
+            }
+
+            /// Otherwise, return the line.
+            line_continued = false;
             new_line();
             return true;
 
@@ -223,7 +236,8 @@ bool sh::term::readc() {
 void sh::term::redraw() {
     write("\r");
     clear_to_end();
-    write(prompt_string);
+    if (line_continued) write("...>");
+    else write(prompt_string);
     write(line);
     to(cur);
 }

@@ -20,6 +20,9 @@ void set_mode(const termios& termios);
 /// Set terminal to raw mode.
 void set_raw();
 
+/// Reset terminal to saved mode.
+void reset();
+
 /// ===========================================================================
 ///  Terminal I/O.
 /// ===========================================================================
