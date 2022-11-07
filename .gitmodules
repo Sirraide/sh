@@ -1,0 +1,6 @@
+[submodule "libs/clopts"]
+	path = libs/clopts
+	url = https://github.com/Sirraide/clopts
+[submodule "libs/fmt"]
+	path = libs/fmt
+	url = https://github.com/fmtlib/fmt
