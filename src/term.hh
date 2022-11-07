@@ -32,6 +32,12 @@ void delete_left();
 /// Delete the character to the right of the cursor.
 void delete_right();
 
+/// Move the logical cursor to the left.
+void move_left();
+
+/// Move the logical cursor to the right.
+void move_right();
+
 /// Print the prompt.
 void new_line();
 
