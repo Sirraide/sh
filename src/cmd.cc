@@ -19,6 +19,12 @@ int sh::cmd::exec(std::string_view cmd) {
     sh::term::reset();
     defer { sh::term::set_raw(); };
 
+    /// If the command doesn’t exist, print an error.
+    if (auto path = sh::utils::which(toks[0].str); path.empty()) {
+        fmt::print(stderr, "sh++: command not found: {}\n", toks[0].str);
+        return 127;
+    }
+
     /// Run the command.
     auto pid = fork();
     if (pid == -1) throw std::runtime_error("fork failed");

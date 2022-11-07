@@ -1,4 +1,5 @@
 #include "cmd.hh"
+#include "ctrl.hh"
 #include "term.hh"
 
 #include <filesystem>
@@ -10,7 +11,7 @@ int main() {
     auto path = std::filesystem::current_path().string();
     auto home = std::getenv("HOME");
     if (path.starts_with(home)) path.replace(0, std::strlen(home), "~");
-    sh::term::set_prompt(fmt::format("\033[33m[sh++] \033[38;2;79;151;215m{} \033[1;38;2;79;151;215m$ \033[m", path));
+    sh::term::set_prompt(fmt::format("\033[33m[sh++] \033[38;2;79;151;215m{} {{}}{{}} \033[1;38;2;79;151;215m$ \033[m", path));
 
     /*auto debug = [&] {
         auto pos = sh::term::cursor::save();
@@ -25,6 +26,6 @@ int main() {
 
         /// Read a line.
         auto line = sh::term::read_line();
-        sh::cmd::exec(line);
+        sh::last_exit_code = sh::cmd::exec(line);
     }
 }

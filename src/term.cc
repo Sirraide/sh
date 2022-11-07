@@ -10,11 +10,29 @@ termios saved;
 [[gnu::constructor]] void save() { saved = sh::term::mode(); }
 [[gnu::destructor]] void restore() { sh::term::set_mode(saved); }
 
-std::string prompt_string;
+std::string prompt_string_template;
 std::string line;
+std::string saved_prompt;
 size_t prompt_size;
 sh::term::cursor::lcur cur;
 bool line_continued = false;
+
+std::string prompt() {
+    auto str = fmt::vformat(prompt_string_template, //
+        fmt::make_format_args(sh::last_exit_code == 0 ? "\033[32m" : "\033[31m", //
+            sh::last_exit_code));
+
+    /// Strip color codes.
+    prompt_size = 0;
+    for (size_t i = 0; i < str.size(); i++) {
+        if (str[i] == '\033')
+            while (str[i] != 'm') i++;
+        else prompt_size++;
+    }
+
+    return str;
+}
+
 } // namespace
 
 termios sh::term::mode() {
@@ -39,7 +57,7 @@ void sh::term::reset() { set_mode(saved); }
 
 void sh::term::clear_line_and_prompt() {
     write("\r");
-    write(prompt_string);
+    write(prompt());
     cur = cursor::lcur::start;
     line.clear();
 }
@@ -106,7 +124,11 @@ void sh::term::move_right() {
 void sh::term::new_line() { write("\r\n"); }
 
 std::string sh::term::read_line() {
-    while (not sh::term::readc());
+    /// Save the current prompt.
+    saved_prompt = prompt();
+
+    while (not sh::term::readc())
+        ;
     write("\r");
     auto ret = line;
     line.clear();
@@ -237,20 +259,13 @@ void sh::term::redraw() {
     write("\r");
     clear_to_end();
     if (line_continued) write("...>");
-    else write(prompt_string);
+    else write(saved_prompt);
     write(line);
     to(cur);
 }
 
 void sh::term::set_prompt(std::string_view prompt) {
-    prompt_string = prompt;
-
-    /// Strip color codes.
-    prompt_size = 0;
-    for (size_t i = 0; i < prompt.size(); i++) {
-        if (prompt[i] == '\033') while (prompt[i] != 'm') i++;
-        else prompt_size++;
-    }
+    prompt_string_template = prompt;
 }
 
 std::string_view sh::term::text() { return line; }
@@ -272,7 +287,6 @@ void sh::term::cursor::lmove_to(cursor::lcur pos) {
 
     cur = pos;
 }
-
 
 auto sh::term::cursor::save() -> pos {
     return pos{size_t(cur), 0};
