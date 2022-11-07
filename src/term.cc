@@ -73,9 +73,15 @@ void sh::term::delete_right() {
 }
 
 void sh::term::echo(std::string_view str) {
-    write(str);
-    line.append(str);
-    cur = cursor::lcur(line.size());
+    /// Insert text at the current cursor position.
+    auto raw = size_t(cur);
+    line.insert(raw, str);
+
+    /// Move the cursor forward.
+    cur = cursor::lcur(raw + str.size());
+
+    /// Redraw the line.
+    redraw();
 }
 
 void sh::term::echo(char c) { echo(std::string_view(&c, 1)); }
@@ -149,6 +155,14 @@ char sh::term::readc() {
                         /// Left arrow.
                         case 'D':
                             move_left();
+                            return -1;
+
+                        /// Insert.
+                        case '2':
+                            n = read(STDIN_FILENO, &c, 1);
+                            if (n == -1) throw std::runtime_error("read() failed");
+                            if (n == 0) return -1;
+                            if (c != '~') echo(fmt::format("033[2{}", c));
                             return -1;
 
                         /// Delete.

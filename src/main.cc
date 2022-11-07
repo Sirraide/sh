@@ -8,7 +8,7 @@ int main() {
     auto path = std::filesystem::current_path().string();
     auto home = std::getenv("HOME");
     if (path.starts_with(home)) path.replace(0, std::strlen(home), "~");
-    sh::term::set_prompt(fmt::format("\033[33msh++ \033[38;2;79;151;215m{} \033[1;38;2;79;151;215m$ \033[m", path));
+    sh::term::set_prompt(fmt::format("\033[33m[sh++] \033[38;2;79;151;215m{} \033[1;38;2;79;151;215m$ \033[m", path));
 
     auto debug = [&] {
         auto pos = sh::term::cursor::save();
