@@ -7,6 +7,22 @@
 namespace fs = std::filesystem;
 
 namespace sh::utils {
+std::string popen(std::string_view cmd) {
+    std::string result;
+    FILE* pipe = ::popen(cmd.data(), "r");
+    if (!pipe) {
+        return result;
+    }
+    defer { ::pclose(pipe); };
+    char buffer[128];
+    while (!feof(pipe)) {
+        if (fgets(buffer, 128, pipe) != nullptr) {
+            result += buffer;
+        }
+    }
+    return result;
+}
+
 std::vector<std::string> split(std::string_view str, char delim) {
     std::vector<std::string> ret;
     std::string::size_type start = 0;

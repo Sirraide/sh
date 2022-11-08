@@ -20,6 +20,9 @@ int exec(std::string_view cmd);
 /// Parse a shell command.
 toks parse(std::string_view cmd);
 
+/// Execute a command and get its output.
+std::pair<int, std::string> popen(std::string_view cmd, bool ignore_stderr = false);
+
 }
 
 #endif // SH_CMD_HH

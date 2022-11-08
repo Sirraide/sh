@@ -1,5 +1,6 @@
 #include "term.hh"
 
+#include "cmd.hh"
 #include "ctrl.hh"
 
 #include <fmt/format.h>
@@ -11,6 +12,7 @@ termios saved;
 [[gnu::destructor]] void restore() { sh::term::set_mode(saved); }
 
 std::string prompt_string_template;
+std::string git_prompt_template;
 std::string line;
 std::string saved_prompt;
 size_t prompt_size;
@@ -18,9 +20,30 @@ sh::term::cursor::lcur cur;
 bool line_continued = false;
 
 std::string prompt() {
-    auto str = fmt::vformat(prompt_string_template, //
-        fmt::make_format_args(sh::last_exit_code == 0 ? "\033[32m" : "\033[31m", //
-            sh::last_exit_code));
+    /// Get the current git branch.
+    auto [status, branch] = sh::cmd::popen("git rev-parse --abbrev-ref HEAD", true);
+
+    /// Format the prompt.
+    std::string str;
+    if (status == 0) {
+        /// Remove the newline.
+        branch.pop_back();
+
+        /// Check if the branch is dirty.
+        auto [st, output] = sh::cmd::popen("git status --porcelain", true);
+        auto dirty = st == 0 && !output.empty();
+
+        /// Format the prompt.
+        str = fmt::vformat(git_prompt_template, //
+            fmt::make_format_args(dirty ? "\033[1;31m" : "\033[1;32m", //
+                branch, //
+                sh::last_exit_code == 0 ? "\033[32m" : "\033[31m", //
+                sh::last_exit_code));
+    } else {
+        str = fmt::vformat(prompt_string_template, //
+            fmt::make_format_args(sh::last_exit_code == 0 ? "\033[32m" : "\033[31m", //
+                sh::last_exit_code));
+    }
 
     /// Strip color codes.
     prompt_size = 0;
@@ -264,8 +287,9 @@ void sh::term::redraw() {
     to(cur);
 }
 
-void sh::term::set_prompt(std::string_view prompt) {
+void sh::term::set_prompt(std::string_view prompt, std::string_view git_prompt) {
     prompt_string_template = prompt;
+    git_prompt_template = git_prompt;
 }
 
 std::string_view sh::term::text() { return line; }

@@ -62,7 +62,7 @@ bool readc();
 void redraw();
 
 /// Set the terminal prompt.
-void set_prompt(std::string_view prompt);
+void set_prompt(std::string_view prompt, std::string_view git_prompt);
 
 /// Get the current line.
 std::string_view text();

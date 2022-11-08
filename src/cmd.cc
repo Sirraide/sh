@@ -4,9 +4,29 @@
 #include "term.hh"
 #include "utils.hh"
 
+#include <fcntl.h>
 #include <fmt/format.h>
 #include <stdexcept>
 #include <sys/wait.h>
+
+namespace {
+int wait_for_child(pid_t pid) {
+    int status;
+    do {
+        if (waitpid(pid, &status, 0) == -1) throw std::runtime_error("waitpid failed");
+    } while (not WIFEXITED(status) and not WIFSIGNALED(status));
+
+    if (WIFSIGNALED(status)) {
+        if (WTERMSIG(status) == SIGSEGV) {
+            fmt::print(stderr, "Segmentation fault (core dumped)\r\033[1A");
+        } else {
+            fmt::print(stderr, "Terminated by signal {}\r\033[1A", WTERMSIG(status));
+        }
+    }
+
+    return WEXITSTATUS(status);
+}
+}
 
 int sh::cmd::exec(std::string_view cmd) {
     if (cmd.empty()) return 0;
@@ -40,21 +60,66 @@ int sh::cmd::exec(std::string_view cmd) {
     }
 
     /// Parent process.
-    else {
-        int status;
-        do {
-            if (waitpid(pid, &status, 0) == -1) throw std::runtime_error("waitpid failed");
-        } while (not WIFEXITED(status) and not WIFSIGNALED(status));
+    else return wait_for_child(pid);
+}
 
-        if (WIFSIGNALED(status)) {
-            if (WTERMSIG(status) == SIGSEGV) {
-                fmt::print(stderr, "Segmentation fault (core dumped)\r\033[1A");
-            } else {
-                fmt::print(stderr, "Terminated by signal {}\r\033[1A", WTERMSIG(status));
-            }
+auto sh::cmd::popen(std::string_view cmd, bool ignore_stderr) -> std::pair<int, std::string> {
+    if (cmd.empty()) return {0, ""};
+    if (cmd == "exit") sh::exit();
+
+    auto toks = parse(cmd);
+    if (toks.empty()) return {0, ""};
+
+    /// Reset the terminal
+    sh::term::reset();
+    defer { sh::term::set_raw(); };
+
+    /// If the command doesn’t exist, print an error.
+    if (auto path = sh::utils::which(toks[0].str); path.empty()) {
+        fmt::print(stderr, "sh++: command not found: {}\n", toks[0].str);
+        return {127, ""};
+    }
+
+    /// Open a pipe to the command.
+    int pipefd[2];
+    if (pipe(pipefd) == -1) throw std::runtime_error("pipe failed");
+
+    /// Run the command.
+    auto pid = fork();
+    if (pid == -1) throw std::runtime_error("fork failed");
+
+    /// Child process.
+    if (pid == 0) {
+        close(pipefd[0]);
+        dup2(pipefd[1], STDOUT_FILENO);
+
+        if (ignore_stderr) {
+            close(STDERR_FILENO);
+            open("/dev/null", O_WRONLY);
         }
 
-        return WEXITSTATUS(status);
+        std::vector<char*> args;
+        for (auto& tok : toks) args.push_back(tok.str.data());
+        args.push_back(nullptr);
+        execvp(args[0], args.data());
+        fmt::print(stderr, "execvp failed: {}", args[0]);
+        sh::exit(1);
+    }
+
+    /// Parent process.
+    else {
+        close(pipefd[1]);
+        std::string result;
+        char buffer[128];
+
+        while (true) {
+            auto n = read(pipefd[0], buffer, 128);
+            if (n == -1) throw std::runtime_error("read failed");
+            if (n == 0) break;
+            result.append(buffer, size_t(n));
+        }
+
+        return {wait_for_child(pid), result};
     }
 }
 
