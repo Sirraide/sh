@@ -7,18 +7,8 @@
 
 int main() {
     sh::term::set_raw();
-
-    auto path = std::filesystem::current_path().string();
-    auto home = std::getenv("HOME");
-    if (path.starts_with(home)) path.replace(0, std::strlen(home), "~");
-    sh::term::set_prompt(fmt::format("\033[33m[sh++] \033[38;2;79;151;215m{} {{}}{{}} \033[1;38;2;79;151;215m$ \033[m", path),
-                         fmt::format("\033[33m[sh++] \033[38;2;79;151;215m{}{{}} @ \033[m\033[34m{{}}\033[38;2;79;151;215m {{}}{{}} \033[1;38;2;79;151;215m$ \033[m", path));
-
-    /*auto debug = [&] {
-        auto pos = sh::term::cursor::save();
-        sh::term::write(fmt::format("\033[50G\033[37m{}\033[m", sh::term::text()));
-        sh::term::cursor::restore(pos);
-    };*/
+    sh::term::set_prompt("\033[33m[sh++] \033[38;2;79;151;215m{} {}{} \033[1;38;2;79;151;215m$ \033[m",
+                         "\033[33m[sh++] \033[38;2;79;151;215m{}{} @ \033[m\033[34m{}\033[38;2;79;151;215m {}{} \033[1;38;2;79;151;215m$ \033[m");
 
     /// Shell main loop.
     for (;;) {

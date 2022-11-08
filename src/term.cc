@@ -3,6 +3,7 @@
 #include "cmd.hh"
 #include "ctrl.hh"
 
+#include <filesystem>
 #include <fmt/format.h>
 #include <stack>
 
@@ -20,6 +21,11 @@ sh::term::cursor::lcur cur;
 bool line_continued = false;
 
 std::string prompt() {
+    /// Get the current path.
+    auto path = std::filesystem::current_path().string();
+    auto home = std::getenv("HOME");
+    if (path.starts_with(home)) path.replace(0, std::strlen(home), "~");
+
     /// Get the current git branch.
     auto [status, branch] = sh::cmd::popen("git rev-parse --abbrev-ref HEAD", true);
 
@@ -34,14 +40,16 @@ std::string prompt() {
         auto dirty = st == 0 && !output.empty();
 
         /// Format the prompt.
-        str = fmt::vformat(git_prompt_template, //
-            fmt::make_format_args(dirty ? "\033[1;31m" : "\033[1;32m", //
-                branch, //
-                sh::last_exit_code == 0 ? "\033[32m" : "\033[31m", //
+        str = fmt::vformat(git_prompt_template,
+            fmt::make_format_args(path,
+                dirty ? "\033[1;31m" : "\033[1;32m",
+                branch,
+                sh::last_exit_code == 0 ? "\033[32m" : "\033[31m",
                 sh::last_exit_code));
     } else {
-        str = fmt::vformat(prompt_string_template, //
-            fmt::make_format_args(sh::last_exit_code == 0 ? "\033[32m" : "\033[31m", //
+        str = fmt::vformat(prompt_string_template,
+            fmt::make_format_args(path,
+                sh::last_exit_code == 0 ? "\033[32m" : "\033[31m",
                 sh::last_exit_code));
     }
 
